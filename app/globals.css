@@ -1,0 +1,48 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #0a0e14;
+  --foreground: #f5f1e8;
+}
+
+@layer base {
+  body {
+    @apply bg-background text-offwhite antialiased;
+  }
+
+  ::selection {
+    @apply bg-gold/30 text-offwhite;
+  }
+}
+
+@layer components {
+  /* Metallic gold text used for the logo/wordmark and headings */
+  .text-gold-metallic {
+    @apply bg-gold-metallic bg-clip-text text-transparent;
+  }
+
+  .nav-link {
+    @apply text-offwhite/70 transition-colors hover:text-gold;
+  }
+}
+
+/* Custom scrollbar to match the WLFS dark theme */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0a0e14;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #74551b;
+  border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #d4a94e;
+}
