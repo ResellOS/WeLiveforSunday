@@ -84,6 +84,16 @@ async function sleeperFetch<T>(
       cache: "no-store",
     });
   } catch (err) {
+    // Never swallow Next.js' internal dynamic-rendering bail-out signal.
+    if (
+      err &&
+      typeof err === "object" &&
+      "digest" in err &&
+      typeof (err as { digest?: unknown }).digest === "string" &&
+      (err as { digest: string }).digest.includes("DYNAMIC_SERVER_USAGE")
+    ) {
+      throw err;
+    }
     throw new SleeperApiError(
       `Network error requesting Sleeper: ${(err as Error).message}`,
       0,
