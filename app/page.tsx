@@ -3,7 +3,6 @@ import {
   loadLeagueSnapshot,
   pairMatchups,
   effectiveWeek,
-  isPlayoffWeek,
   type StandingRow,
 } from "@/lib/league";
 import {
@@ -13,7 +12,7 @@ import {
   leaguePulse,
 } from "@/lib/home";
 import { getLatestSeason } from "@/lib/queries";
-import { TRADE_DEADLINE, ROOKIE_DRAFT_DATE, LEAGUE_TAGLINE } from "@/lib/config";
+import { TRADE_DEADLINE, ROOKIE_DRAFT_DATE } from "@/lib/config";
 import { Panel, SectionHeading, EmptyState } from "@/components/ui/Panel";
 import { MatchupCard } from "@/components/MatchupCard";
 import { StandingsTable } from "@/components/StandingsTable";
@@ -57,9 +56,6 @@ export default async function HomePage() {
 
   const motw = pickMatchupOfWeek(pairs, rankByRoster);
   const closest = pickClosestMatchup(pairs);
-  const closestLabel = isPlayoffWeek(week, league)
-    ? "Closest Playoff Matchup"
-    : "Closest Matchup";
 
   const pulse = leaguePulse(standings);
   const kickoff = nextNflKickoff(state.season_type);
@@ -70,53 +66,60 @@ export default async function HomePage() {
       : undefined;
 
   return (
-    <div className="space-y-8">
-      {/* Hero */}
-      <section className="text-center">
-        <p className="mb-2 font-display text-xs uppercase tracking-[0.3em] text-gold">
-          {league.name} · {league.season}
-        </p>
-        <h1 className="font-display text-3xl font-bold text-gold-metallic sm:text-5xl">
-          We Live for Sundays
-        </h1>
-        <p className="mt-3 text-sm text-offwhite/60">{LEAGUE_TAGLINE}</p>
-      </section>
-
-      <div className="grid gap-6 lg:grid-cols-3">
-        {/* Main column */}
-        <div className="space-y-6 lg:col-span-2">
-          {/* Featured matchups */}
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <SectionHeading title="Matchup of the Week" />
-              {motw ? (
-                <MatchupCard pair={motw} teamsByRoster={teamsByRoster} live={live} />
-              ) : (
-                <EmptyState
-                  title="No matchups yet"
-                  message={`Week ${week} isn't scheduled — check back when the season kicks off.`}
-                />
-              )}
-            </div>
-            <div>
-              <SectionHeading title={closestLabel} />
-              {closest ? (
-                <MatchupCard
-                  pair={closest}
-                  teamsByRoster={teamsByRoster}
-                  live={live}
-                />
-              ) : (
-                <EmptyState
-                  title="No matchups yet"
-                  message="Closest margins appear once games are scheduled."
-                />
-              )}
-            </div>
-          </div>
-
-          {/* Standings */}
+    <div className="home-dashboard">
+      <div className="home-grid">
+        {/* Left · 33% — Matchup of the Week / Closest / Countdowns */}
+        <section className="home-col">
           <Panel className="p-4">
+            <SectionHeading
+              title="Matchup of the Week"
+              subtitle={`Week ${week}${live ? " · live" : ""}`}
+            />
+            {motw ? (
+              <MatchupCard pair={motw} teamsByRoster={teamsByRoster} live={live} />
+            ) : (
+              <EmptyState
+                title="No matchups yet"
+                message={`Week ${week} isn't scheduled — check back when the season kicks off.`}
+              />
+            )}
+          </Panel>
+
+          <Panel className="home-col-fill p-4">
+            <SectionHeading title="Closest Playoff Matchup" />
+            {closest ? (
+              <MatchupCard
+                pair={closest}
+                teamsByRoster={teamsByRoster}
+                live={live}
+              />
+            ) : (
+              <EmptyState
+                title="No matchups yet"
+                message="Closest margins appear once games are scheduled."
+              />
+            )}
+          </Panel>
+
+          <Panel className="home-col-foot space-y-4 p-4">
+            <SectionHeading title="Countdowns" />
+            <Countdown label="Next NFL Kickoff" targetISO={kickoff.toISOString()} />
+            <div className="divider-gold" />
+            <Countdown
+              label="Trade Deadline"
+              targetISO={TRADE_DEADLINE.toISOString()}
+            />
+            <div className="divider-gold" />
+            <Countdown
+              label="Rookie Draft"
+              targetISO={ROOKIE_DRAFT_DATE.toISOString()}
+            />
+          </Panel>
+        </section>
+
+        {/* Center · 30% — Current Standings / Sleeper News */}
+        <section className="home-col">
+          <Panel className="home-col-fill p-4">
             <SectionHeading
               title="Current Standings"
               subtitle={`${standings.length} teams · top ${playoffTeams} make the playoffs`}
@@ -124,14 +127,34 @@ export default async function HomePage() {
             <StandingsTable standings={standings} playoffCutoff={playoffTeams} />
           </Panel>
 
-          {/* This week's matchups */}
-          <Panel className="p-4">
+          <Panel className="home-col-foot space-y-3 p-4">
+            <SectionHeading title="Sleeper News" />
+            {pulse.length > 0 ? (
+              pulse.slice(0, 3).map((line, i) => (
+                <p
+                  key={i}
+                  className="border-l-2 border-gold/40 pl-3 text-sm text-offwhite/80"
+                >
+                  {line}
+                </p>
+              ))
+            ) : (
+              <p className="text-sm text-offwhite/50">
+                League updates appear here once activity arrives.
+              </p>
+            )}
+          </Panel>
+        </section>
+
+        {/* Right · 37% — This Week's Matchups / Past Champion */}
+        <aside className="home-col">
+          <Panel className="home-col-fill p-4">
             <SectionHeading
               title="This Week's Matchups"
               subtitle={`Week ${week}${live ? " · live" : ""}`}
             />
             {pairs.length > 0 ? (
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-3">
                 {pairs.map((p) => (
                   <MatchupCard
                     key={p.matchupId}
@@ -148,60 +171,21 @@ export default async function HomePage() {
               />
             )}
           </Panel>
-        </div>
 
-        {/* Sidebar */}
-        <aside className="space-y-6">
-          {/* Countdowns */}
-          <Panel className="space-y-4 p-4">
-            <SectionHeading title="Countdowns" />
-            <Countdown label="Next NFL Kickoff" targetISO={kickoff.toISOString()} />
-            <div className="divider-gold" />
-            <Countdown
-              label="Trade Deadline"
-              targetISO={TRADE_DEADLINE.toISOString()}
-            />
-            <div className="divider-gold" />
-            <Countdown
-              label="Rookie Draft"
-              targetISO={ROOKIE_DRAFT_DATE.toISOString()}
-            />
-          </Panel>
-
-          {/* League pulse */}
-          <Panel className="space-y-3 p-4">
-            <SectionHeading title="League Pulse" />
-            {pulse.length > 0 ? (
-              pulse.map((line, i) => (
-                <p
-                  key={i}
-                  className="border-l-2 border-gold/40 pl-3 text-sm text-offwhite/80"
-                >
-                  {line}
-                </p>
-              ))
-            ) : (
-              <p className="text-sm text-offwhite/50">
-                Headlines appear once the season is underway.
-              </p>
-            )}
-          </Panel>
-
-          {/* Past champion */}
-          <Panel className="p-4">
-            <SectionHeading title="Reigning Champion" />
+          <Panel className="home-col-foot p-4">
+            <SectionHeading title="Past Champion" />
             {latestSeason ? (
-              <div className="text-center">
-                <div className="text-4xl">🏆</div>
-                <div className="mt-2 font-display text-lg font-bold text-gold-metallic">
-                  {champTeam?.teamName ?? `Roster #${latestSeason.champion_roster_id}`}
-                </div>
-                <div className="text-sm text-offwhite/60">
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-wider text-gold">
                   {latestSeason.year} Champion
+                </div>
+                <div className="mt-1 font-display text-lg font-bold text-gold-metallic">
+                  {champTeam?.teamName ??
+                    `Roster #${latestSeason.champion_roster_id}`}
                 </div>
                 {latestSeason.championship_score_winner != null && (
                   <div className="mt-2 text-xs text-offwhite/50">
-                    Title game:{" "}
+                    Championship score:{" "}
                     {fmtPoints(latestSeason.championship_score_winner)}
                     {latestSeason.championship_score_loser != null &&
                       ` – ${fmtPoints(latestSeason.championship_score_loser)}`}
@@ -210,8 +194,8 @@ export default async function HomePage() {
               </div>
             ) : (
               <EmptyState
-                title="No champion crowned yet"
-                message="The first WLFS champion will be enshrined here after the inaugural season."
+                title="Inaugural Champion"
+                message="The first WLFS champion will be enshrined here after the 2026 season."
               />
             )}
           </Panel>

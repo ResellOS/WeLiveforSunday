@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import SeasonSelector from "@/components/SeasonSelector";
@@ -18,18 +19,20 @@ export default function Header() {
 
   return (
     <header className="sticky top-0 z-50 border-b border-gold/20 bg-background/85 backdrop-blur-md">
-      <div className="mx-auto flex h-16 w-full max-w-7xl items-center gap-6 px-4 sm:px-6 lg:px-8">
-        {/* Logo (left) */}
-        <Link href="/" className="flex shrink-0 items-center gap-2">
-          <span className="grid h-9 w-9 place-items-center rounded-md bg-gold-metallic font-display text-lg font-bold text-background shadow-md shadow-gold/20">
-            W
-          </span>
-          <span className="hidden font-display text-lg font-bold tracking-wide text-gold-metallic sm:inline">
-            We Live for Sundays
-          </span>
+      <div className="mx-auto flex h-16 w-full max-w-[1920px] items-center gap-6 px-4 sm:px-6 lg:px-8">
+        {/* Official logo — full logoalt.png, uncropped */}
+        <Link href="/" className="flex shrink-0 items-center">
+          <Image
+            src="/logoalt.png"
+            alt="WLFS — We Live for Sundays"
+            width={1536}
+            height={483}
+            priority
+            className="h-12 w-auto"
+          />
         </Link>
 
-        {/* Primary nav */}
+        {/* Primary nav — unchanged */}
         <nav className="hidden items-center gap-6 lg:flex">
           {NAV_ITEMS.map((item) => {
             const isActive =
@@ -52,7 +55,7 @@ export default function Header() {
           })}
         </nav>
 
-        {/* Right: season selector + search */}
+        {/* Right: season selector + search — unchanged */}
         <div className="ml-auto flex items-center gap-3">
           <SeasonSelector />
           <SearchBar />

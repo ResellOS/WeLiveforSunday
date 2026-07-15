@@ -53,6 +53,41 @@
   }
 }
 
+/* -------------------------------------------------------------------------
+   Homepage dashboard composition (layout only)
+------------------------------------------------------------------------- */
+.home-dashboard {
+  width: 100%;
+}
+
+.home-grid {
+  display: grid;
+  gap: 0.85rem;
+  align-items: stretch;
+}
+
+.home-col {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.home-col-fill {
+  flex: 1 1 auto;
+}
+
+.home-col-foot {
+  flex: 0 0 auto;
+  margin-top: auto;
+}
+
+@media (min-width: 1024px) {
+  .home-grid {
+    grid-template-columns: minmax(0, 33fr) minmax(0, 30fr) minmax(0, 37fr);
+  }
+}
+
 /* Custom scrollbar to match the WLFS dark theme */
 ::-webkit-scrollbar {
   width: 10px;
