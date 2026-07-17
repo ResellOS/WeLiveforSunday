@@ -9,7 +9,7 @@ const config: Config = {
     extend: {
       colors: {
         // WLFS design system
-        background: "#0A0E14", // deep charcoal/navy
+        background: "#050606", // warm near-black
         gold: {
           DEFAULT: "#D4A94E", // metallic gold accent
           50: "#FBF6EA",
@@ -39,8 +39,9 @@ const config: Config = {
         offwhite: "#F5F1E8", // off-white text
       },
       fontFamily: {
-        sans: ["var(--font-inter)", "system-ui", "sans-serif"],
+        sans: ["var(--font-rajdhani)", "system-ui", "sans-serif"],
         display: ["var(--font-display)", "Georgia", "serif"],
+        condensed: ["var(--font-condensed)", "Impact", "sans-serif"],
       },
       backgroundImage: {
         "gold-metallic":

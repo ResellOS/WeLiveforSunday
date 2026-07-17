@@ -9,12 +9,28 @@ const STYLES: Record<ContenderStatus, string> = {
   Rebuilding: "border-crimson/50 bg-crimson/15 text-crimson-200",
 };
 
-export function StatusBadge({ status }: { status: ContenderStatus }) {
+const TEAMS_STATUS: Record<ContenderStatus, string> = {
+  Contender: "status-badge-teams status-badge-teams--contender",
+  "Playoff Hopeful": "status-badge-teams status-badge-teams--hopeful",
+  Borderline: "status-badge-teams status-badge-teams--borderline",
+  Retooling: "status-badge-teams status-badge-teams--retooling",
+  Rebuilding: "status-badge-teams status-badge-teams--rebuilding",
+};
+
+export function StatusBadge({
+  status,
+  variant = "default",
+}: {
+  status: ContenderStatus;
+  variant?: "default" | "teams";
+}) {
   return (
     <span
       className={cn(
-        "inline-block rounded-full border px-2.5 py-0.5 text-[11px] font-semibold tracking-wide",
-        STYLES[status],
+        variant === "teams"
+          ? TEAMS_STATUS[status]
+          : "inline-block rounded-full border px-2.5 py-0.5 text-[11px] font-semibold tracking-wide",
+        variant === "default" && STYLES[status],
       )}
     >
       {status}

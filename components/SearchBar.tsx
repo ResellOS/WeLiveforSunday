@@ -1,11 +1,22 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+
+const PLACEHOLDERS: Array<[prefix: string, text: string]> = [
+  ["/trophy-room", "Search the trophy room…"],
+  ["/teams", "Search teams…"],
+  ["/history", "Search league history…"],
+  ["/record-book", "Search the record book…"],
+];
 
 export default function SearchBar() {
   const [query, setQuery] = useState("");
   const router = useRouter();
+  const pathname = usePathname();
+  const placeholder =
+    PLACEHOLDERS.find(([prefix]) => pathname.startsWith(prefix))?.[1] ??
+    "Search the league…";
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -15,28 +26,18 @@ export default function SearchBar() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="relative hidden md:block">
+    <form onSubmit={handleSubmit} className="search-shell hidden md:block">
       <span className="sr-only">Search</span>
-      <svg
-        className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gold/60"
-        fill="none"
-        viewBox="0 0 24 24"
-        strokeWidth={2}
-        stroke="currentColor"
-        aria-hidden="true"
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"
-        />
+      <svg className="search-glyph" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <circle cx="10.5" cy="10.5" r="6.2" />
+        <path d="m15.4 15.4 5.1 5.1" />
       </svg>
       <input
         type="search"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        placeholder="Search teams, players…"
-        className="w-44 rounded-md border border-gold/30 bg-background py-1.5 pl-8 pr-3 text-sm text-offwhite placeholder:text-offwhite/40 outline-none transition-colors hover:border-gold focus:w-56 focus:border-gold focus:ring-1 focus:ring-gold"
+        placeholder={placeholder}
+        className="search-field"
       />
     </form>
   );

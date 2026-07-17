@@ -1,19 +1,26 @@
 import type { Metadata } from "next";
-import { Inter, Cinzel } from "next/font/google";
+import { Cinzel, Oswald, Rajdhani } from "next/font/google";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import "./globals.css";
 
-const inter = Inter({
+const rajdhani = Rajdhani({
   subsets: ["latin"],
-  variable: "--font-inter",
+  variable: "--font-rajdhani",
+  weight: ["400", "500", "600", "700"],
   display: "swap",
 });
 
-// Cinzel gives the trophy-room / record-book "engraved" display feel.
 const cinzel = Cinzel({
   subsets: ["latin"],
   variable: "--font-display",
+  display: "swap",
+});
+
+const oswald = Oswald({
+  subsets: ["latin"],
+  variable: "--font-condensed",
+  weight: ["400", "500", "600", "700"],
   display: "swap",
 });
 
@@ -32,10 +39,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${inter.variable} ${cinzel.variable}`}>
-      <body className="flex min-h-screen flex-col">
+    <html
+      lang="en"
+      className={`${rajdhani.variable} ${cinzel.variable} ${oswald.variable}`}
+    >
+      <body className="flex min-h-screen flex-col font-sans">
         <Header />
-        <main className="mx-auto w-full max-w-[1920px] flex-1 px-4 py-3 sm:px-6 lg:px-8">
+        <main className="mx-auto w-full max-w-[1920px] flex-1 px-4 py-3 sm:px-5 lg:px-6">
           {children}
         </main>
         <Footer />

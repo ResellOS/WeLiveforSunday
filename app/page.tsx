@@ -8,18 +8,26 @@ import {
 import {
   nextNflKickoff,
   pickMatchupOfWeek,
-  pickClosestMatchup,
-  leaguePulse,
+  computePowerRankings,
+  placeholderFantasyNews,
+  buildNflScheduleBoard,
 } from "@/lib/home";
+import { loadTopFantasyPerformers } from "@/lib/server/topPerformers";
+import { loadLeagueActivity } from "@/lib/leagueActivity";
 import { getLatestSeason } from "@/lib/queries";
 import { TRADE_DEADLINE, ROOKIE_DRAFT_DATE } from "@/lib/config";
 import { Panel, SectionHeading, EmptyState } from "@/components/ui/Panel";
-import { MatchupCard } from "@/components/MatchupCard";
 import { StandingsTable } from "@/components/StandingsTable";
 import { Countdown } from "@/components/Countdown";
+import { SleeperNews } from "@/components/SleeperNews";
+import Image from "next/image";
+import { FeaturedModule } from "@/components/home/FeaturedModule";
+import { LeagueChat } from "@/components/home/LeagueChat";
+import { WeeklyMatchupsPager } from "@/components/home/WeeklyMatchupsPager";
+import { NflScoreTicker } from "@/components/home/NflScoreTicker";
+import { FantasyPerformersCarousel } from "@/components/home/FantasyPerformersCarousel";
 import { fmtPoints } from "@/lib/format";
 
-// Live-ish data; re-fetch at most every 5 minutes.
 export const dynamic = "force-dynamic";
 
 function NoLeague() {
@@ -55,151 +63,154 @@ export default async function HomePage() {
   );
 
   const motw = pickMatchupOfWeek(pairs, rankByRoster);
-  const closest = pickClosestMatchup(pairs);
+  const powerRankings = computePowerRankings(standings);
+  const newsItems = placeholderFantasyNews();
+  const nflGames = buildNflScheduleBoard(state.season_type, week);
+  const fantasyBoard = await loadTopFantasyPerformers(leagueId, week);
+  const leagueActivity = await loadLeagueActivity(leagueId, week, standings);
 
-  const pulse = leaguePulse(standings);
   const kickoff = nextNflKickoff(state.season_type);
 
-  const champTeam =
-    latestSeason?.champion_roster_id != null
-      ? teamsByRoster.get(latestSeason.champion_roster_id)
-      : undefined;
+  const hasChampion =
+    latestSeason?.champion_roster_id != null &&
+    latestSeason.champion_roster_id > 0;
+  const champTeam = hasChampion
+    ? teamsByRoster.get(latestSeason!.champion_roster_id!)
+    : undefined;
 
   return (
-    <div className="home-dashboard">
+    <div className="home-dashboard home-page">
+      <span className="home-atmosphere-vignette" aria-hidden="true" />
+      <span className="home-atmosphere-particles" aria-hidden="true" />
+      <span className="home-atmosphere-texture" aria-hidden="true" />
+      <span className="home-atmosphere-light" aria-hidden="true" />
       <div className="home-grid">
-        {/* Left · 33% — Matchup of the Week / Closest / Countdowns */}
-        <section className="home-col">
-          <Panel className="p-4">
-            <SectionHeading
-              title="Matchup of the Week"
-              subtitle={`Week ${week}${live ? " · live" : ""}`}
+        <Panel className="home-area-featured panel--featured p-4">
+          <FeaturedModule
+            motw={motw}
+            teamsByRoster={teamsByRoster}
+            live={live}
+            week={week}
+            powerRankings={powerRankings}
+          />
+        </Panel>
+
+        <Panel className="home-area-countdown panel--countdown space-y-1 p-4">
+          <SectionHeading title="Countdowns" />
+          <Countdown
+            label="Next NFL Kickoff"
+            targetISO={kickoff.toISOString()}
+            icon="kickoff"
+          />
+          <div className="divider-gold" />
+          <Countdown
+            label="Trade Deadline"
+            targetISO={TRADE_DEADLINE.toISOString()}
+            icon="trade"
+          />
+          <div className="divider-gold" />
+          <Countdown
+            label="Rookie Draft"
+            targetISO={ROOKIE_DRAFT_DATE.toISOString()}
+            icon="draft"
+          />
+        </Panel>
+
+        <Panel className="home-area-standings panel--standings p-4">
+          <SectionHeading
+            title="Current Standings"
+            subtitle={`${standings.length} teams · top ${playoffTeams} make the playoffs`}
+            action={<span className="panel-action">View Full Standings</span>}
+          />
+          <StandingsTable standings={standings} playoffCutoff={playoffTeams} />
+          <span className="metal-button mt-3 w-full">View Full Standings</span>
+        </Panel>
+
+        <Panel className="home-area-news panel--news p-4">
+          <SectionHeading
+            title="Sleeper News"
+            action={<span className="panel-action">View All News</span>}
+          />
+          <SleeperNews items={newsItems} />
+          <span className="metal-button mt-3 w-full">View All News</span>
+        </Panel>
+
+        <Panel className="home-area-matchups panel--scoreboard p-4">
+          {pairs.length > 0 ? (
+            <WeeklyMatchupsPager
+              pairs={pairs}
+              teams={standings}
+              live={live}
+              week={week}
             />
-            {motw ? (
-              <MatchupCard pair={motw} teamsByRoster={teamsByRoster} live={live} />
-            ) : (
-              <EmptyState
-                title="No matchups yet"
-                message={`Week ${week} isn't scheduled — check back when the season kicks off.`}
+          ) : (
+            <>
+              <SectionHeading
+                title="This Week's Matchups"
+                subtitle={`Week ${week}${live ? " · live" : ""}`}
+                action={<span className="panel-action">View All Matchups</span>}
               />
-            )}
-          </Panel>
-
-          <Panel className="home-col-fill p-4">
-            <SectionHeading title="Closest Playoff Matchup" />
-            {closest ? (
-              <MatchupCard
-                pair={closest}
-                teamsByRoster={teamsByRoster}
-                live={live}
-              />
-            ) : (
-              <EmptyState
-                title="No matchups yet"
-                message="Closest margins appear once games are scheduled."
-              />
-            )}
-          </Panel>
-
-          <Panel className="home-col-foot space-y-4 p-4">
-            <SectionHeading title="Countdowns" />
-            <Countdown label="Next NFL Kickoff" targetISO={kickoff.toISOString()} />
-            <div className="divider-gold" />
-            <Countdown
-              label="Trade Deadline"
-              targetISO={TRADE_DEADLINE.toISOString()}
-            />
-            <div className="divider-gold" />
-            <Countdown
-              label="Rookie Draft"
-              targetISO={ROOKIE_DRAFT_DATE.toISOString()}
-            />
-          </Panel>
-        </section>
-
-        {/* Center · 30% — Current Standings / Sleeper News */}
-        <section className="home-col">
-          <Panel className="home-col-fill p-4">
-            <SectionHeading
-              title="Current Standings"
-              subtitle={`${standings.length} teams · top ${playoffTeams} make the playoffs`}
-            />
-            <StandingsTable standings={standings} playoffCutoff={playoffTeams} />
-          </Panel>
-
-          <Panel className="home-col-foot space-y-3 p-4">
-            <SectionHeading title="Sleeper News" />
-            {pulse.length > 0 ? (
-              pulse.slice(0, 3).map((line, i) => (
-                <p
-                  key={i}
-                  className="border-l-2 border-gold/40 pl-3 text-sm text-offwhite/80"
-                >
-                  {line}
-                </p>
-              ))
-            ) : (
-              <p className="text-sm text-offwhite/50">
-                League updates appear here once activity arrives.
-              </p>
-            )}
-          </Panel>
-        </section>
-
-        {/* Right · 37% — This Week's Matchups / Past Champion */}
-        <aside className="home-col">
-          <Panel className="home-col-fill p-4">
-            <SectionHeading
-              title="This Week's Matchups"
-              subtitle={`Week ${week}${live ? " · live" : ""}`}
-            />
-            {pairs.length > 0 ? (
-              <div className="space-y-3">
-                {pairs.map((p) => (
-                  <MatchupCard
-                    key={p.matchupId}
-                    pair={p}
-                    teamsByRoster={teamsByRoster}
-                    live={live}
-                  />
-                ))}
-              </div>
-            ) : (
               <EmptyState
                 title="Schedule not released"
-                message="The weekly schedule appears here once the NFL season begins."
+                message="Featured matchups appear here once the NFL season begins."
               />
-            )}
-          </Panel>
+            </>
+          )}
+          <LeagueChat initial={leagueActivity} />
+        </Panel>
 
-          <Panel className="home-col-foot p-4">
-            <SectionHeading title="Past Champion" />
-            {latestSeason ? (
+        <Panel className="home-area-champion panel--champion p-4">
+          <SectionHeading
+            title="Past Champion"
+            action={<span className="panel-action">View Champions</span>}
+          />
+          {hasChampion && latestSeason ? (
+            <div className="inaugural-champion inaugural-champion-live">
               <div>
-                <div className="text-xs font-semibold uppercase tracking-wider text-gold">
+                <p className="inaugural-kicker">
                   {latestSeason.year} Champion
-                </div>
-                <div className="mt-1 font-display text-lg font-bold text-gold-metallic">
+                </p>
+                <p className="mt-2 font-display text-2xl font-bold text-gold-metallic">
                   {champTeam?.teamName ??
                     `Roster #${latestSeason.champion_roster_id}`}
-                </div>
+                </p>
                 {latestSeason.championship_score_winner != null && (
-                  <div className="mt-2 text-xs text-offwhite/50">
+                  <p className="inaugural-copy">
                     Championship score:{" "}
                     {fmtPoints(latestSeason.championship_score_winner)}
                     {latestSeason.championship_score_loser != null &&
                       ` – ${fmtPoints(latestSeason.championship_score_loser)}`}
-                  </div>
+                  </p>
                 )}
               </div>
-            ) : (
-              <EmptyState
-                title="Inaugural Champion"
-                message="The first WLFS champion will be enshrined here after the 2026 season."
+            </div>
+          ) : (
+            <div className="champion-artwork-wrap">
+              <Image
+                src="/images/first-champion.png"
+                alt="WLFS inaugural champion to be crowned after the 2026 season"
+                fill
+                className="champion-artwork-img"
+                sizes="(min-width: 1024px) 28vw, 100vw"
+                priority
               />
-            )}
-          </Panel>
-        </aside>
+              <div className="champion-artwork-particles" aria-hidden="true" />
+            </div>
+          )}
+        </Panel>
+      </div>
+
+      <div className="home-bottom-strip">
+        <Panel className="home-area-ticker panel--ticker p-4">
+          <NflScoreTicker games={nflGames} />
+        </Panel>
+        <Panel className="home-area-performers panel--performers p-4">
+          <FantasyPerformersCarousel
+            performers={fantasyBoard.performers}
+            label={fantasyBoard.label}
+            projected={fantasyBoard.projected}
+          />
+        </Panel>
       </div>
     </div>
   );

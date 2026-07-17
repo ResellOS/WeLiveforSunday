@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 function parts(ms: number) {
   const clamped = Math.max(0, ms);
@@ -11,13 +11,89 @@ function parts(ms: number) {
   return { days, hours, minutes, seconds };
 }
 
+export type CountdownIcon = "kickoff" | "trade" | "draft";
+
+const ICON_PATHS: Record<CountdownIcon, React.ReactNode> = {
+  kickoff: (
+    <>
+      <defs>
+        <linearGradient id="cd-kick" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#f1d68d" />
+          <stop offset="1" stopColor="#63431e" />
+        </linearGradient>
+      </defs>
+      <path
+        d="M4 18c0-7.2 4.2-12.2 8-14.8 3.8 2.6 8 7.6 8 14.8"
+        fill="url(#cd-kick)"
+        fillOpacity="0.2"
+      />
+      <path d="M4 18c0-7.2 4.2-12.2 8-14.8 3.8 2.6 8 7.6 8 14.8" />
+      <ellipse cx="12" cy="16.5" rx="7.5" ry="1.8" />
+      <path d="M8.5 10.5 12 7l3.5 3.5M12 7v5.5" />
+      <circle cx="12" cy="5.5" r="1.2" fill="currentColor" />
+    </>
+  ),
+  trade: (
+    <>
+      <path d="M3.5 7.5h11.5" strokeWidth="2" />
+      <path d="m13.2 4.2 3.3 3.3-3.3 3.3" strokeWidth="2" />
+      <path d="M20.5 16.5H9" strokeWidth="2" />
+      <path d="m10.8 13.2-3.3 3.3 3.3 3.3" strokeWidth="2" />
+      <circle cx="6" cy="7.5" r="1.5" fill="currentColor" />
+      <circle cx="18" cy="16.5" r="1.5" fill="currentColor" />
+    </>
+  ),
+  draft: (
+    <>
+      <path
+        d="M5 14.5V9.5c0-4 3.2-6.8 7-6.8s7 2.8 7 6.8v5"
+        fill="currentColor"
+        fillOpacity="0.12"
+      />
+      <path d="M5 14.5V9.5c0-4 3.2-6.8 7-6.8s7 2.8 7 6.8v5" />
+      <path d="M4 14.5h16v2.5H4z" />
+      <path d="M9 14.5V11h6v3.5" />
+      <path d="M12 4.5v3M10 6.5h4" />
+      <circle cx="12" cy="3.2" r="1" fill="currentColor" />
+    </>
+  ),
+};
+
+function FlipDigit({ value }: { value: string }) {
+  const prev = useRef(value);
+  const [flipping, setFlipping] = useState(false);
+
+  useEffect(() => {
+    if (prev.current !== value) {
+      setFlipping(true);
+      prev.current = value;
+      const t = setTimeout(() => setFlipping(false), 320);
+      return () => clearTimeout(t);
+    }
+  }, [value]);
+
+  return (
+    <span
+      className={[
+        "countdown-digit",
+        flipping && "countdown-digit-flip",
+      ]
+        .filter(Boolean)
+        .join(" ")}
+    >
+      {value}
+    </span>
+  );
+}
+
 export function Countdown({
   label,
   targetISO,
+  icon = "kickoff",
 }: {
   label: string;
-  /** Target instant as an ISO string (serializable across the server boundary). */
   targetISO: string;
+  icon?: CountdownIcon;
 }) {
   const target = new Date(targetISO).getTime();
   const [now, setNow] = useState<number | null>(null);
@@ -28,34 +104,43 @@ export function Countdown({
     return () => clearInterval(id);
   }, []);
 
-  const remaining = now == null ? target - Date.now() : target - now;
+  const mounted = now != null;
+  const remaining = mounted ? target - now : 0;
   const { days, hours, minutes, seconds } = parts(remaining);
-  const passed = remaining <= 0;
+  const passed = mounted && remaining <= 0;
 
   const cells: Array<[number, string]> = [
-    [days, "D"],
-    [hours, "H"],
-    [minutes, "M"],
-    [seconds, "S"],
+    [days, "DAYS"],
+    [hours, "HRS"],
+    [minutes, "MIN"],
+    [seconds, "SEC"],
   ];
 
   return (
-    <div>
-      <div className="text-xs uppercase tracking-wider text-offwhite/50">
-        {label}
-      </div>
-      {passed ? (
-        <div className="mt-1 font-display text-lg font-bold text-crimson-300">
-          Passed
+    <div className="countdown-row">
+      <span className="countdown-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none">
+          {ICON_PATHS[icon]}
+        </svg>
+      </span>
+      <div className="countdown-label">{label}</div>
+      {!mounted ? (
+        <div className="countdown-cells" aria-hidden="true">
+          {cells.map(([, u]) => (
+            <div key={u} className="text-center">
+              <span className="countdown-digit">--</span>
+              <span className="countdown-unit">{u}</span>
+            </div>
+          ))}
         </div>
+      ) : passed ? (
+        <div className="countdown-passed">Passed</div>
       ) : (
-        <div className="mt-1 flex gap-2" suppressHydrationWarning>
+        <div className="countdown-cells">
           {cells.map(([v, u]) => (
             <div key={u} className="text-center">
-              <span className="font-display text-xl font-bold tabular-nums text-gold-metallic">
-                {String(v).padStart(2, "0")}
-              </span>
-              <span className="ml-0.5 text-[10px] text-offwhite/40">{u}</span>
+              <FlipDigit value={String(v).padStart(2, "0")} />
+              <span className="countdown-unit">{u}</span>
             </div>
           ))}
         </div>
