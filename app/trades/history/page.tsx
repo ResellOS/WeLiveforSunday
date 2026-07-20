@@ -1,30 +1,52 @@
 import type { Metadata } from "next";
-import { Panel } from "@/components/ui/Panel";
-import { TradeTreeTabs } from "@/components/trades/TradeTreeTabs";
+import { TradeHistoryPage } from "@/components/trades/TradeHistoryPage";
+import { loadTradeLogBundle } from "@/lib/trades/tradeLog";
+import { buildTradeHistoryDeals } from "@/lib/trades/tradeHistory";
+import { getKtcValueMap } from "@/lib/queries";
 
 export const metadata: Metadata = { title: "Trade History" };
+export const dynamic = "force-dynamic";
 
-export default function TradeHistoryPage() {
-  return (
-    <div className="tt-page">
-      <Panel className="panel--banner tt-banner">
-        <div className="tt-banner-inner">
-          <div>
-            <p className="tt-kicker">Trades</p>
-            <h1 className="tt-title">Trade History</h1>
-            <p className="tt-sub">Full league trade ledger — coming soon.</p>
-          </div>
-        </div>
-      </Panel>
-      <TradeTreeTabs />
-      <Panel className="tt-stage-panel">
-        <div className="tt-state" role="status">
-          <p>TRADE HISTORY ARCHIVE</p>
-          <p className="tt-state-sub">
-            This section is a placeholder so Trade Tree navigation stays intact.
-          </p>
-        </div>
-      </Panel>
-    </div>
-  );
+export default async function TradeHistoryRoute() {
+  const leagueId = process.env.SLEEPER_LEAGUE_ID;
+
+  if (!leagueId) {
+    return (
+      <TradeHistoryPage
+        deals={[]}
+        teams={{}}
+        seasons={[new Date().getFullYear()]}
+        source="sleeper"
+        errorMessage="League is not configured. Set SLEEPER_LEAGUE_ID to load trades."
+      />
+    );
+  }
+
+  try {
+    const [bundle, ktc] = await Promise.all([
+      loadTradeLogBundle(leagueId),
+      getKtcValueMap(),
+    ]);
+    const deals = buildTradeHistoryDeals(bundle.rows, bundle.teams, ktc);
+
+    return (
+      <TradeHistoryPage
+        deals={deals}
+        teams={bundle.teams}
+        seasons={bundle.seasons}
+        source={bundle.source}
+      />
+    );
+  } catch (err) {
+    console.error("[trades/history] failed to load:", err);
+    return (
+      <TradeHistoryPage
+        deals={[]}
+        teams={{}}
+        seasons={[new Date().getFullYear()]}
+        source="sleeper"
+        errorMessage="Could not load trade history. Please retry."
+      />
+    );
+  }
 }

@@ -8,6 +8,8 @@
     "start": "next start",
     "lint": "next lint",
     "update-ktc": "tsx scripts/update-ktc-values.ts",
+    "resolve-picks": "tsx scripts/resolve-picks.ts",
+    "trade-aging": "tsx scripts/resolve-picks.ts --aging",
     "test:sleeper": "tsx scripts/test-sleeper.ts"
   },
   "dependencies": {

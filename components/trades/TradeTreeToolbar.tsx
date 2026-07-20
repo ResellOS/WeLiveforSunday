@@ -93,7 +93,7 @@ export function TradeTreeToolbar({
     <div className="tt-toolbar">
       <div className="tt-search" ref={wrapRef}>
         <label className="tt-search-label" htmlFor={`${listId}-input`}>
-          Player
+          Select Asset
         </label>
         <div className="tt-search-shell search-shell">
           <svg
@@ -119,7 +119,7 @@ export function TradeTreeToolbar({
                 : undefined
             }
             className="search-field tt-search-field"
-            placeholder="Search league players…"
+            placeholder="Search players…"
             value={query}
             disabled={disabled}
             onChange={(e) => {

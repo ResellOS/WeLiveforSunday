@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import { TradeTreePage } from "@/components/trades/TradeTreePage";
 import { loadTradeLogBundle } from "@/lib/trades/tradeLog";
+import { resolveTradeDeepLink } from "@/lib/trades/tradeHistory";
+import { getKtcValueMap } from "@/lib/queries";
 import { FIRST_SEASON } from "@/lib/config";
 
 export const metadata: Metadata = { title: "Trade Tree" };
@@ -23,10 +25,16 @@ function parsePlayer(raw: string | string[] | undefined): string | null {
   return id ? id : null;
 }
 
+function parseTradeId(raw: string | string[] | undefined): string | null {
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  const id = value?.trim();
+  return id ? id : null;
+}
+
 export default async function TradeTreeRoute({
   searchParams,
 }: {
-  searchParams?: { player?: string; season?: string };
+  searchParams?: { player?: string; season?: string; tradeId?: string };
 }) {
   const leagueId = process.env.SLEEPER_LEAGUE_ID;
 
@@ -40,6 +48,7 @@ export default async function TradeTreeRoute({
           seasons={[FIRST_SEASON]}
           initialPlayerId={null}
           initialSeason={FIRST_SEASON}
+          initialTradeId={null}
           source="sleeper"
           errorMessage="League is not configured. Set SLEEPER_LEAGUE_ID to load trades."
         />
@@ -48,9 +57,21 @@ export default async function TradeTreeRoute({
   }
 
   try {
-    const bundle = await loadTradeLogBundle(leagueId);
-    const season = parseSeason(searchParams?.season, bundle.seasons);
-    const playerId = parsePlayer(searchParams?.player);
+    const [bundle, ktc] = await Promise.all([
+      loadTradeLogBundle(leagueId),
+      getKtcValueMap(),
+    ]);
+
+    const tradeId = parseTradeId(searchParams?.tradeId);
+    const deepLink = tradeId
+      ? resolveTradeDeepLink(bundle.rows, tradeId, ktc)
+      : null;
+
+    const playerId =
+      parsePlayer(searchParams?.player) ?? deepLink?.primaryAssetId ?? null;
+    const season = deepLink
+      ? deepLink.seasonYear
+      : parseSeason(searchParams?.season, bundle.seasons);
 
     return (
       <Suspense fallback={<div className="tt-state">Loading trade tree…</div>}>
@@ -61,6 +82,7 @@ export default async function TradeTreeRoute({
           seasons={bundle.seasons}
           initialPlayerId={playerId}
           initialSeason={season}
+          initialTradeId={tradeId}
           source={bundle.source}
         />
       </Suspense>
@@ -78,6 +100,7 @@ export default async function TradeTreeRoute({
           initialSeason={
             Number(searchParams?.season) || new Date().getFullYear()
           }
+          initialTradeId={parseTradeId(searchParams?.tradeId)}
           source="sleeper"
           errorMessage="Could not load trade history. Please retry."
         />

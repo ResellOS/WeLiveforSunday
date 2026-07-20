@@ -1,6 +1,5 @@
 /**
- * Trade Tree types — mirror public.trade_log (0002_trade_log.sql) plus
- * graph/node shapes used by the React Flow canvas.
+ * Shared trade_log / Trade Tree types.
  */
 
 export type TradeAssetType = "player" | "draft_pick";
@@ -24,6 +23,9 @@ export interface TradeLogRow {
   original_roster_id: number | null;
   from_roster_id: number;
   to_roster_id: number;
+  resolved_player_id?: string | null;
+  resolved_player_name?: string | null;
+  resolved_at?: string | null;
   created_at?: string;
 }
 
@@ -44,53 +46,3 @@ export interface TradePlayerOption {
   ownerRosterId: number | null;
   ownerName: string | null;
 }
-
-export type TradeTreeNodeData = {
-  assetId: string;
-  assetType: TradeAssetType;
-  label: string;
-  playerName?: string;
-  playerPosition?: string;
-  nflTeam?: string;
-  playerImageUrl?: string;
-  draftSeason?: number;
-  draftRound?: number;
-  originalOwnerName?: string;
-  ownerRosterId?: string;
-  ownerName?: string;
-  ownerAvatarUrl?: string;
-  teamColor?: string;
-  transactionId?: string;
-  tradeDate?: string;
-  hasChildren: boolean;
-  isExpanded: boolean;
-  isRoot?: boolean;
-  isDimmed?: boolean;
-  isSelected?: boolean;
-};
-
-/** Logical tree node before React Flow / dagre layout. */
-export interface TradeTreeNode {
-  id: string;
-  parentId: string | null;
-  data: TradeTreeNodeData;
-  children: TradeTreeNode[];
-}
-
-export interface BuildTradeTreeResult {
-  root: TradeTreeNode | null;
-  /** Flat list of visible nodes (respecting expansion). */
-  visibleNodes: TradeTreeNode[];
-  /** True when the root player has no trades at/after the selected season. */
-  noTrades: boolean;
-  /**
-   * Season rule: selected season sets the starting trade; later-season
-   * trades remain reachable via expand.
-   */
-  seasonMode: "start_in_season_continue_forward";
-}
-
-export const ROOT_NODE_WIDTH = 280;
-export const CHILD_NODE_WIDTH = 240;
-export const ROOT_NODE_HEIGHT = 80;
-export const CHILD_NODE_HEIGHT = 66;

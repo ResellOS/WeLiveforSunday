@@ -101,6 +101,9 @@ export interface TradeLogRow {
   original_roster_id: number | null;
   from_roster_id: number;
   to_roster_id: number;
+  resolved_player_id?: string | null;
+  resolved_player_name?: string | null;
+  resolved_at?: string | null;
   created_at?: string;
 }
 

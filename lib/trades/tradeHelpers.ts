@@ -98,6 +98,35 @@ export function getFirstTradeForAsset(
   return candidates[0] ?? null;
 }
 
+/** Specific asset row within a transaction (for tradeId deep-links). */
+export function getAssetRowInTransaction(
+  rows: TradeLogRow[],
+  assetId: string,
+  transactionId: string,
+): TradeLogRow | null {
+  return (
+    rows.find(
+      (r) => r.asset_id === assetId && r.transaction_id === transactionId,
+    ) ?? null
+  );
+}
+
+/** Latest completed move for an asset (any season), or null. */
+export function getLatestTradeForAsset(
+  rows: TradeLogRow[],
+  assetId: string,
+): TradeLogRow | null {
+  const candidates = rows
+    .filter((r) => r.asset_id === assetId)
+    .sort((a, b) => {
+      if (a.trade_date !== b.trade_date) {
+        return b.trade_date.localeCompare(a.trade_date);
+      }
+      return b.transaction_id.localeCompare(a.transaction_id);
+    });
+  return candidates[0] ?? null;
+}
+
 export function resolveReceivingRoster(row: TradeLogRow): number {
   return row.to_roster_id;
 }

@@ -16,9 +16,14 @@ import {
 } from "@/lib/sleeper";
 import { getSeasonChain } from "@/lib/records";
 import { buildTeams } from "@/lib/league";
-import { teamAccentColor } from "@/lib/teamColor";
+import { teamColorForRoster } from "@/lib/config/teamColors";
 import { sleeperPlayerThumb } from "@/lib/sleeperMedia";
 import { draftPickAssetId } from "@/lib/trades/tradeHelpers";
+import {
+  applyPickResolutionsToRows,
+  buildPickResolutionMap,
+  persistPickResolutions,
+} from "@/lib/pick-resolution";
 import type {
   TradeLogRow,
   TradePlayerOption,
@@ -74,6 +79,9 @@ function txnToRows(
       original_roster_id: null,
       from_roster_id: fromRoster,
       to_roster_id: toRoster,
+      resolved_player_id: null,
+      resolved_player_name: null,
+      resolved_at: null,
     });
   }
 
@@ -99,6 +107,9 @@ function txnToRows(
       original_roster_id: pick.roster_id,
       from_roster_id: pick.previous_owner_id,
       to_roster_id: pick.owner_id,
+      resolved_player_id: null,
+      resolved_player_name: null,
+      resolved_at: null,
     });
   }
 
@@ -124,32 +135,68 @@ async function loadRowsFromSleeper(leagueId: string): Promise<TradeLogRow[]> {
   return rows;
 }
 
+/** True once we know migration 0003 columns are absent (avoids upsert/log spam). */
+const RESOLVED_SCHEMA_FLAG = "__wlfsTradeLogResolvedColsMissing";
+
+function tradeLogResolvedSchemaMissing(): boolean {
+  return Boolean((globalThis as Record<string, unknown>)[RESOLVED_SCHEMA_FLAG]);
+}
+
+function markTradeLogResolvedSchemaMissing(): void {
+  (globalThis as Record<string, unknown>)[RESOLVED_SCHEMA_FLAG] = true;
+}
+
+function isMissingColumnError(message: string): boolean {
+  const m = message.toLowerCase();
+  return (
+    m.includes("does not exist") ||
+    m.includes("could not find the") ||
+    m.includes("schema cache")
+  );
+}
+
+/** Upsert payload matching live trade_log schema (uuid id + optional resolved_*). */
+function toTradeLogUpsertRow(row: TradeLogRow): Record<string, unknown> {
+  const base: Record<string, unknown> = {
+    league_id: row.league_id,
+    season_year: row.season_year,
+    week: row.week,
+    transaction_id: row.transaction_id,
+    trade_date: row.trade_date,
+    asset_type: row.asset_type,
+    asset_id: row.asset_id,
+    player_id: row.player_id,
+    player_name: row.player_name,
+    player_position: row.player_position,
+    nfl_team: row.nfl_team,
+    draft_season: row.draft_season,
+    draft_round: row.draft_round,
+    original_roster_id: row.original_roster_id,
+    from_roster_id: row.from_roster_id,
+    to_roster_id: row.to_roster_id,
+  };
+  // Never send synthetic sleeper ids — DB id is uuid with gen_random_uuid().
+  if (!tradeLogResolvedSchemaMissing()) {
+    if (row.resolved_player_id != null) {
+      base.resolved_player_id = row.resolved_player_id;
+    }
+    if (row.resolved_player_name != null) {
+      base.resolved_player_name = row.resolved_player_name;
+    }
+    if (row.resolved_at != null) {
+      base.resolved_at = row.resolved_at;
+    }
+  }
+  return base;
+}
+
 async function loadRowsFromSupabase(leagueId: string): Promise<TradeLogRow[]> {
   if (!isSupabaseConfigured()) return [];
+
+  // select('*') returns whatever columns exist — safe before/after migration 0003.
   const { data, error } = await supabase
     .from("trade_log")
-    .select(
-      [
-        "id",
-        "league_id",
-        "season_year",
-        "week",
-        "transaction_id",
-        "trade_date",
-        "asset_type",
-        "asset_id",
-        "player_id",
-        "player_name",
-        "player_position",
-        "nfl_team",
-        "draft_season",
-        "draft_round",
-        "original_roster_id",
-        "from_roster_id",
-        "to_roster_id",
-        "created_at",
-      ].join(","),
-    )
+    .select("*")
     .eq("league_id", leagueId)
     .order("trade_date", { ascending: true });
 
@@ -168,15 +215,36 @@ async function maybeSyncToSupabase(rows: TradeLogRow[]): Promise<void> {
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) return;
   try {
     const admin = getSupabaseAdmin();
-    // Chunk to stay under payload limits.
     const chunkSize = 200;
     for (let i = 0; i < rows.length; i += chunkSize) {
-      const chunk = rows.slice(i, i + chunkSize);
+      const chunk = rows.slice(i, i + chunkSize).map(toTradeLogUpsertRow);
       const { error } = await admin.from("trade_log").upsert(chunk, {
         onConflict: "transaction_id,asset_id,to_roster_id",
         ignoreDuplicates: false,
       });
       if (error) {
+        if (isMissingColumnError(error.message)) {
+          markTradeLogResolvedSchemaMissing();
+          // Retry once without resolved_* fields.
+          const baseOnly = chunk.map((row) => {
+            const {
+              resolved_player_id: _a,
+              resolved_player_name: _b,
+              resolved_at: _c,
+              ...rest
+            } = row;
+            return rest;
+          });
+          const retry = await admin.from("trade_log").upsert(baseOnly, {
+            onConflict: "transaction_id,asset_id,to_roster_id",
+            ignoreDuplicates: false,
+          });
+          if (retry.error) {
+            console.warn("[trade_log] sync skipped:", retry.error.message);
+            return;
+          }
+          continue;
+        }
         console.warn("[trade_log] sync skipped:", error.message);
         return;
       }
@@ -202,7 +270,7 @@ async function loadTeamMap(leagueId: string): Promise<Record<number, TradeTeamIn
       teamName: t.teamName,
       managerName: t.managerName,
       avatar: t.avatar,
-      accentColor: teamAccentColor(t.teamName),
+      accentColor: teamColorForRoster(t.rosterId),
     };
   }
   return map;
@@ -254,25 +322,38 @@ function buildPlayerCatalog(
 
 /**
  * Load trade_log for the league plus team/player catalogs for the Trade Tree UI.
+ *
+ * Sleeper completed trades are the canonical history. Supabase is a write-through
+ * cache — a partial table must not hide the full Sleeper chain.
  */
 export async function loadTradeLogBundle(leagueId: string): Promise<TradeLogBundle> {
-  const [supabaseRows, teams, players, rosters, chain] = await Promise.all([
-    loadRowsFromSupabase(leagueId),
-    loadTeamMap(leagueId),
-    getAllPlayers().catch((): PlayerMap => ({})),
-    getRosters(leagueId).catch(() => []),
-    getSeasonChain(leagueId).catch(() => []),
-  ]);
+  const [supabaseRows, sleeperRows, teams, players, rosters, chain] =
+    await Promise.all([
+      loadRowsFromSupabase(leagueId),
+      loadRowsFromSleeper(leagueId).catch(() => [] as TradeLogRow[]),
+      loadTeamMap(leagueId),
+      getAllPlayers().catch((): PlayerMap => ({})),
+      getRosters(leagueId).catch(() => []),
+      getSeasonChain(leagueId).catch(() => []),
+    ]);
 
-  let rows = supabaseRows;
-  let source: TradeLogSource = "supabase";
+  let rows: TradeLogRow[];
+  let source: TradeLogSource;
 
-  if (rows.length === 0) {
-    rows = await loadRowsFromSleeper(leagueId);
+  if (sleeperRows.length > 0) {
+    rows = sleeperRows;
     source = "sleeper";
-    // Fire-and-forget sync when the table exists + admin key is configured.
-    void maybeSyncToSupabase(rows);
+    void maybeSyncToSupabase(sleeperRows);
+  } else if (supabaseRows.length > 0) {
+    rows = supabaseRows;
+    source = "supabase";
+  } else {
+    rows = [];
+    source = "sleeper";
   }
+
+  // Resolve drafted players onto pick rows (in-memory + best-effort DB persist).
+  rows = await enrichRowsWithPickResolutions(leagueId, rows);
 
   const rosterPlayerIds = rosters.flatMap((r) => r.players ?? []);
   // Overlay live roster ownership onto catalog.
@@ -304,6 +385,35 @@ export async function loadTradeLogBundle(leagueId: string): Promise<TradeLogBund
   }
 
   return { rows, source, teams, players: catalog, seasons };
+}
+
+/**
+ * When any draft-pick row is still unresolved, match Sleeper completed drafts
+ * and stamp resolved_player_* onto the in-memory rows. Persistence is
+ * best-effort so page loads still work without the migration applied.
+ */
+async function enrichRowsWithPickResolutions(
+  leagueId: string,
+  rows: TradeLogRow[],
+): Promise<TradeLogRow[]> {
+  const needsResolve = rows.some(
+    (r) => r.asset_type === "draft_pick" && !r.resolved_player_id,
+  );
+  if (!needsResolve) return rows;
+
+  try {
+    const { map } = await buildPickResolutionMap(leagueId);
+    if (map.size === 0) return rows;
+    const enriched = applyPickResolutionsToRows(rows, map);
+    void persistPickResolutions(leagueId, map);
+    return enriched;
+  } catch (err) {
+    console.warn(
+      "[trade_log] pick resolution skipped:",
+      err instanceof Error ? err.message : err,
+    );
+    return rows;
+  }
 }
 
 /** Debounced player search helper (server). */

@@ -1,0 +1,12 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/resolve-picks",
+      "schedule": "0 12 * * *"
+    },
+    {
+      "path": "/api/cron/trade-aging",
+      "schedule": "0 15 1 1 *"
+    }
+  ]
+}
