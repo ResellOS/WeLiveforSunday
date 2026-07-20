@@ -11,6 +11,7 @@ import {
   computePowerRankings,
   placeholderFantasyNews,
   buildNflScheduleBoard,
+  loadNflTickerBoard,
 } from "@/lib/home";
 import { loadTopFantasyPerformers } from "@/lib/server/topPerformers";
 import { loadLeagueActivity } from "@/lib/leagueActivity";
@@ -65,7 +66,10 @@ export default async function HomePage() {
   const motw = pickMatchupOfWeek(pairs, rankByRoster);
   const powerRankings = computePowerRankings(standings);
   const newsItems = placeholderFantasyNews();
-  const nflGames = buildNflScheduleBoard(state.season_type, week);
+  const nflBoard = await loadNflTickerBoard(state).catch(() => ({
+    games: buildNflScheduleBoard(state.season_type, week),
+    label: `Week ${week}`,
+  }));
   const fantasyBoard = await loadTopFantasyPerformers(leagueId, week);
   const leagueActivity = await loadLeagueActivity(leagueId, week, standings);
 
@@ -202,7 +206,7 @@ export default async function HomePage() {
 
       <div className="home-bottom-strip">
         <Panel className="home-area-ticker panel--ticker p-4">
-          <NflScoreTicker games={nflGames} />
+          <NflScoreTicker games={nflBoard.games} label={nflBoard.label} />
         </Panel>
         <Panel className="home-area-performers panel--performers p-4">
           <FantasyPerformersCarousel

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
-import { getSeasons, getMilestones } from "@/lib/queries";
+import { getSeasons, getMilestones, getNotableMoments } from "@/lib/queries";
 import { loadLeagueHistory, getSeasonChain } from "@/lib/records";
 import { computeAllSeasonMVPs } from "@/lib/stats";
 import { Panel } from "@/components/ui/Panel";
@@ -27,9 +27,10 @@ export default async function HistoryPage({
   const view = parseHistoryView(searchParams?.view);
   const leagueId = process.env.SLEEPER_LEAGUE_ID;
 
-  const [seasons, milestones, history, chain] = await Promise.all([
+  const [seasons, milestones, notableMoments, history, chain] = await Promise.all([
     getSeasons(),
     getMilestones(),
+    getNotableMoments(),
     leagueId ? loadLeagueHistory(leagueId) : Promise.resolve(null),
     leagueId ? getSeasonChain(leagueId) : Promise.resolve([]),
   ]);
@@ -53,11 +54,18 @@ export default async function HistoryPage({
     (s) => s.champion_roster_id != null,
   ).length;
 
-  const feedMoments = CEREMONIAL_MOMENTS.map((m) => ({
-    title: m.title,
-    detail: m.detail,
-    date: null as string | null,
-  }));
+  const feedMoments =
+    notableMoments.length > 0
+      ? notableMoments.map((m) => ({
+          title: m.title,
+          detail: m.description ?? m.stat_highlight ?? "",
+          date: m.season_year ? String(m.season_year) : null,
+        }))
+      : CEREMONIAL_MOMENTS.map((m) => ({
+          title: m.title,
+          detail: m.detail,
+          date: null as string | null,
+        }));
 
   const firstChampionLabel =
     completedSeasons > 0 ? "Crowned" : "To Be Crowned";

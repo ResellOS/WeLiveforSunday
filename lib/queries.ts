@@ -82,6 +82,28 @@ export interface ManagerMetadataRow {
   display_name: string | null;
 }
 
+/** Mirrors public.trade_log (see supabase/migrations/0002_trade_log.sql). */
+export interface TradeLogRow {
+  id: string;
+  league_id: string;
+  season_year: number;
+  week: number | null;
+  transaction_id: string;
+  trade_date: string;
+  asset_type: "player" | "draft_pick";
+  asset_id: string;
+  player_id: string | null;
+  player_name: string | null;
+  player_position: string | null;
+  nfl_team: string | null;
+  draft_season: number | null;
+  draft_round: number | null;
+  original_roster_id: number | null;
+  from_roster_id: number;
+  to_roster_id: number;
+  created_at?: string;
+}
+
 /** Wrap a Supabase read so any failure (missing env, table, network) yields a fallback. */
 async function safe<T>(fallback: T, fn: () => Promise<T>): Promise<T> {
   if (!isSupabaseConfigured()) return fallback;
@@ -175,5 +197,19 @@ export function getManagerMetadata(): Promise<ManagerMetadataRow[]> {
     const { data, error } = await supabase.from("manager_metadata").select("*");
     if (error) throw error;
     return data ?? [];
+  });
+}
+
+/** Public read of trade_log. Returns [] when the table is missing or empty. */
+export function getTradeLog(leagueId?: string): Promise<TradeLogRow[]> {
+  return safe<TradeLogRow[]>([], async () => {
+    let query = supabase
+      .from("trade_log")
+      .select("*")
+      .order("trade_date", { ascending: true });
+    if (leagueId) query = query.eq("league_id", leagueId);
+    const { data, error } = await query;
+    if (error) throw error;
+    return (data ?? []) as TradeLogRow[];
   });
 }

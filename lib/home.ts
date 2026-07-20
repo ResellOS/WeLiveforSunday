@@ -251,7 +251,10 @@ export function placeholderFantasyNews(): FantasyNewsItem[] {
   ];
 }
 
-export type NflTickerGame = {
+export type { NflTickerGame } from "@/lib/nflSchedule";
+export { loadNflTickerBoard } from "@/lib/nflSchedule";
+
+export type NflTickerGameLegacy = {
   id: string;
   away: string;
   home: string;
@@ -269,11 +272,11 @@ export type NflTickerGame = {
   network?: string;
 };
 
-/** NFL schedule board — pregame truthfully labeled; no invented live scores. */
+/** @deprecated Use loadNflTickerBoard — static fallback when API is unavailable. */
 export function buildNflScheduleBoard(
   seasonType: string,
   week = 1,
-): NflTickerGame[] {
+): NflTickerGameLegacy[] {
   const inSeason = seasonType === "regular" || seasonType === "post";
   const slate: Array<{
     id: string;
@@ -311,8 +314,8 @@ export function buildNflScheduleBoard(
   }));
 }
 
-/** @deprecated Use buildNflScheduleBoard — kept for imports during transition */
-export function placeholderNflScores(): NflTickerGame[] {
+/** @deprecated Use loadNflTickerBoard — kept for imports during transition */
+export function placeholderNflScores(): NflTickerGameLegacy[] {
   return buildNflScheduleBoard("pre", 1);
 }
 

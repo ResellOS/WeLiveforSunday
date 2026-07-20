@@ -4,10 +4,12 @@ export function Panel({
   className,
   children,
   hover = false,
+  id,
 }: {
   className?: string;
   children: React.ReactNode;
   hover?: boolean;
+  id?: string;
 }) {
   const tokens = (className ?? "").split(/\s+/).filter(Boolean);
   const shellKeep = new Set([
@@ -33,7 +35,7 @@ export function Panel({
     .join(" ");
 
   return (
-    <section className={cn("panel", hover && "panel-hover", shellClass)}>
+    <section id={id} className={cn("panel", hover && "panel-hover", shellClass)}>
       <span className="panel-frame" aria-hidden="true" />
       <span className="corner corner-tl" aria-hidden="true" />
       <span className="corner corner-tr" aria-hidden="true" />

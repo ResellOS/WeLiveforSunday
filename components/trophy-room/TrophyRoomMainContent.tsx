@@ -6,7 +6,9 @@ import type { JerseyRow } from "@/lib/queries";
 
 export function TrophyRoomMainContent({
   view,
+  championByYear = {},
   jerseyByYear,
+  teamNames = {},
 }: {
   view: TrophyView;
   championByYear?: Record<number, { champion_roster_id: number | null }>;
@@ -18,7 +20,10 @@ export function TrophyRoomMainContent({
   if (view === "championship") {
     return (
       <>
-        <ChampionshipHistory />
+        <ChampionshipHistory
+          championByYear={championByYear}
+          teamNames={teamNames}
+        />
         <JerseyWall jerseyByYear={jerseyMap} />
       </>
     );

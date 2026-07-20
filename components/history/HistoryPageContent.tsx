@@ -135,7 +135,19 @@ export function HistoryPageContent({
 
     default: {
       const copy = EMPTY_COPY[view as keyof typeof EMPTY_COPY];
-      return <HistoryEmptyView title={copy?.title ?? "History"} />;
+      const action =
+        view === "records"
+          ? { href: "/record-book", label: "Open Record Book" }
+          : view === "leaders"
+            ? { href: "/record-book#all-time-leaders", label: "View All-Time Leaders" }
+            : undefined;
+      return (
+        <HistoryEmptyView
+          title={copy?.title ?? "History"}
+          actionHref={action?.href}
+          actionLabel={action?.label}
+        />
+      );
     }
   }
 }

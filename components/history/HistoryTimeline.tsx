@@ -1,4 +1,5 @@
 import Image from "next/image";
+import Link from "next/link";
 import { Panel } from "@/components/ui/Panel";
 import { ChampionTrophy } from "@/components/ChampionTrophy";
 import { teamAccentColor } from "@/lib/teamColor";
@@ -80,7 +81,9 @@ export function HistoryTimeline({
                   <p className="vault-copy">
                     The first chapter of WLFS history begins.
                   </p>
-                  <span className="vault-cta">History Begins Here</span>
+                  <Link href="/trophy-room" className="vault-cta">
+                    History Begins Here
+                  </Link>
                 </div>
               );
             }

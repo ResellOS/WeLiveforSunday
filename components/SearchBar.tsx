@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 const PLACEHOLDERS: Array<[prefix: string, text: string]> = [
   ["/trophy-room", "Search the trophy room…"],
   ["/teams", "Search teams…"],
+  ["/trades", "Search trades…"],
   ["/history", "Search league history…"],
   ["/record-book", "Search the record book…"],
 ];
@@ -26,7 +27,7 @@ export default function SearchBar() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="search-shell hidden md:block">
+    <form onSubmit={handleSubmit} className="search-shell">
       <span className="sr-only">Search</span>
       <svg className="search-glyph" viewBox="0 0 24 24" fill="none" aria-hidden="true">
         <circle cx="10.5" cy="10.5" r="6.2" />

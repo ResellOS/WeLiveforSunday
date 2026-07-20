@@ -16,7 +16,7 @@ export const FIRST_SEASON = 2018;
 export const TRADE_DEADLINE = new Date("2026-11-17T23:59:00-05:00");
 
 /** Rookie draft date. */
-export const ROOKIE_DRAFT_DATE = new Date("2026-08-25T20:00:00-04:00");
+export const ROOKIE_DRAFT_DATE = new Date("2027-08-01T20:00:00-04:00");
 
 /**
  * Fallback NFL kickoff used only if Sleeper's NFL state can't provide a live

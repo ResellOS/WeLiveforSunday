@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { getSeasons, getKtcValueMap, getNotableMoments, getJerseys } from "@/lib/queries";
 import { getAllPlayers, getTransactions, playerName } from "@/lib/sleeper";
 import type { PlayerMap } from "@/types/sleeper";
@@ -11,11 +12,14 @@ import {
   bottomWeeklyScores,
   biggestBlowouts,
   longestWinStreaks,
+  fewestPointsAgainstSeason,
+  longestSeasonWinStreaks,
+  topPlayoffScores,
 } from "@/lib/records";
 import { Panel, EmptyState } from "@/components/ui/Panel";
-import { MuseumDirectory, type DirectoryItem } from "@/components/trophy/MuseumDirectory";
 import { TrophyGlyph } from "@/components/trophy/TrophyGlyph";
 import { JerseyCase } from "@/components/trophy/JerseyCase";
+import { RecordBookDirectory } from "@/components/record-book/RecordBookDirectory";
 import { LeaderDashboard } from "@/components/record-book/LeaderDashboard";
 import {
   RecordSection,
@@ -30,22 +34,26 @@ export const dynamic = "force-dynamic";
 const INAUGURAL_YEAR = 2026;
 const PLAQUE_YEARS = [2026, 2027, 2028, 2029];
 
-const CATEGORIES: DirectoryItem[] = [
-  { key: "overview", label: "Overview" },
-  { key: "wins", label: "Wins" },
-  { key: "winningPct", label: "Winning %" },
-  { key: "championship", label: "Championships" },
-  { key: "playoffs", label: "Playoff Wins" },
-  { key: "highestScorer", label: "Points For" },
-  { key: "pointsAgainst", label: "Points Against" },
-  { key: "tradeOfYear", label: "Trades" },
-  { key: "winStreaks", label: "Win Streaks" },
-  { key: "blowouts", label: "Blowouts" },
-  { key: "mostPointsWeek", label: "Weekly Records" },
-  { key: "mostPointsPlayoffs", label: "Playoff Records" },
-  { key: "biggestComeback", label: "Comebacks" },
-  { key: "leagueRecords", label: "League Records" },
-];
+function championshipLeaders(
+  seasons: Awaited<ReturnType<typeof getSeasons>>,
+  teamName: (id: number) => string,
+) {
+  const counts = new Map<number, number>();
+  for (const s of seasons) {
+    if (s.champion_roster_id == null) continue;
+    counts.set(
+      s.champion_roster_id,
+      (counts.get(s.champion_roster_id) ?? 0) + 1,
+    );
+  }
+  return [...counts.entries()]
+    .map(([rosterId, value]) => ({
+      rosterId,
+      teamName: teamName(rosterId),
+      value,
+    }))
+    .sort((a, b) => b.value - a.value);
+}
 
 export default async function RecordBookPage() {
   const leagueId = process.env.SLEEPER_LEAGUE_ID;
@@ -78,8 +86,16 @@ export default async function RecordBookPage() {
   const lowWeeks = bottomWeeklyScores(history);
   const blowouts = biggestBlowouts(history);
   const streaks = longestWinStreaks(history);
+  const seasonStreaks = longestSeasonWinStreaks(history);
+  const playoffScores = topPlayoffScores(history);
+  const fewestPaSeason = fewestPointsAgainstSeason(history);
   const trades = mostTrades.filter((r) => r.value > 0);
   const playersTraded = mostPlayersTraded.filter((r) => r.value > 0);
+
+  const nameFor = (rosterId: number) =>
+    history.latestTeams.get(rosterId)?.teamName ?? `Roster #${rosterId}`;
+
+  const titleLeaders = championshipLeaders(seasons, nameFor);
 
   let biggestTrade: { value: number; season: string; week: number } | null =
     null;
@@ -108,11 +124,12 @@ export default async function RecordBookPage() {
     (s) => s.champion_roster_id != null,
   ).length;
   const franchiseCount = history.latestTeams.size || 16;
-  const firstChampion =
-    completedSeasons > 0
-      ? (history.latestTeams.get(seasons[seasons.length - 1].champion_roster_id!)
-          ?.teamName ?? "Crowned")
-      : null;
+  const firstChampionSeason = seasons
+    .filter((s) => s.champion_roster_id != null)
+    .sort((a, b) => a.year - b.year)[0];
+  const firstChampion = firstChampionSeason
+    ? nameFor(firstChampionSeason.champion_roster_id!)
+    : null;
   const seasonByYear = new Map(seasons.map((s) => [s.year, s]));
   const jerseyByYear = new Map(jerseys.map((j) => [j.season_year, j]));
 
@@ -125,6 +142,7 @@ export default async function RecordBookPage() {
       holder: pf[0]?.teamName ?? null,
       value: pf[0] ? `${pf[0].value.toLocaleString()} pts` : null,
       placeholder: `Awaiting ${INAUGURAL_YEAR} Champion`,
+      rosterId: pf[0]?.rosterId ?? null,
     },
     {
       glyph: "mostPointsWeek",
@@ -134,6 +152,7 @@ export default async function RecordBookPage() {
         ? `${fmtPoints(highWeeks[0].points)} · ${gameRef(highWeeks[0].season, highWeeks[0].week)}`
         : null,
       placeholder: "To Be Set",
+      rosterId: highWeeks[0]?.rosterId ?? null,
     },
     {
       glyph: "blowouts",
@@ -143,13 +162,17 @@ export default async function RecordBookPage() {
         ? (blowouts[0].detail ?? `${fmtPoints(blowouts[0].points)} pts`)
         : null,
       placeholder: "Awaiting Week 1",
+      rosterId: blowouts[0]?.rosterId ?? null,
     },
     {
       glyph: "mostPointsPlayoffs",
       label: "Most Playoff Points (Game)",
-      holder: null,
-      value: null,
+      holder: playoffScores[0]?.teamName ?? null,
+      value: playoffScores[0]
+        ? `${fmtPoints(playoffScores[0].points)} · ${gameRef(playoffScores[0].season, playoffScores[0].week)}`
+        : null,
       placeholder: "Awaiting First Postseason",
+      rosterId: playoffScores[0]?.rosterId ?? null,
     },
   ];
 
@@ -157,25 +180,30 @@ export default async function RecordBookPage() {
     {
       glyph: "pointsAgainst",
       label: "Fewest Points Against (Season)",
-      holder: null,
-      value: null,
+      holder: fewestPaSeason?.teamName ?? null,
+      value: fewestPaSeason
+        ? `${fewestPaSeason.value.toLocaleString()} pts · ${fewestPaSeason.season}`
+        : null,
       placeholder: `Awaiting ${INAUGURAL_YEAR} Season`,
+      rosterId: fewestPaSeason?.rosterId ?? null,
     },
     {
       glyph: "leagueMvp",
-      label: "Lowest Weekly Score Against",
+      label: "Lowest Weekly Score",
       holder: lowWeeks[0]?.teamName ?? null,
       value: lowWeeks[0]
         ? `${fmtPoints(lowWeeks[0].points)} · ${gameRef(lowWeeks[0].season, lowWeeks[0].week)}`
         : null,
       placeholder: "To Be Set",
+      rosterId: lowWeeks[0]?.rosterId ?? null,
     },
     {
       glyph: "bestRegular",
       label: "Highest Winning Margin",
-      holder: null,
-      value: null,
+      holder: blowouts[0]?.teamName ?? null,
+      value: blowouts[0]?.detail ?? null,
       placeholder: "Awaiting Week 1",
+      rosterId: blowouts[0]?.rosterId ?? null,
     },
   ];
 
@@ -188,13 +216,15 @@ export default async function RecordBookPage() {
         ? `${streaks.overall[0].value} W`
         : null,
       placeholder: "No Record Yet",
+      rosterId: streaks.overall[0]?.rosterId ?? null,
     },
     {
       glyph: "wins",
       label: "Longest Win Streak (Season)",
-      holder: null,
-      value: null,
+      holder: seasonStreaks[0]?.value ? seasonStreaks[0].teamName : null,
+      value: seasonStreaks[0]?.value ? `${seasonStreaks[0].value} W` : null,
       placeholder: "No Record Yet",
+      rosterId: seasonStreaks[0]?.rosterId ?? null,
     },
     {
       glyph: "playoffs",
@@ -204,6 +234,7 @@ export default async function RecordBookPage() {
         ? `${streaks.playoff[0].value} W`
         : null,
       placeholder: "Awaiting First Postseason",
+      rosterId: streaks.playoff[0]?.rosterId ?? null,
     },
   ];
 
@@ -217,17 +248,18 @@ export default async function RecordBookPage() {
     },
     {
       glyph: "biggestComeback",
-      label: "Most Comeback Wins",
+      label: "Largest Comeback Win",
       holder: comebackMoments[0]?.title ?? null,
       value: comebackMoments[0]?.stat_highlight ?? null,
-      placeholder: "No Record Yet",
+      placeholder: "To Be Set",
+      href: comebackMoments[0] ? "/history?view=milestones" : null,
     },
     {
       glyph: "recordBreakers",
-      label: "Largest Comeback Win",
+      label: "Most Comeback Wins",
       holder: null,
       value: null,
-      placeholder: "To Be Set",
+      placeholder: "No Record Yet",
     },
   ];
 
@@ -238,6 +270,7 @@ export default async function RecordBookPage() {
       holder: trades[0]?.teamName ?? null,
       value: trades[0] ? String(trades[0].value) : null,
       placeholder: "No League Trades Recorded",
+      rosterId: trades[0]?.rosterId ?? null,
     },
     {
       glyph: "franchises",
@@ -245,6 +278,7 @@ export default async function RecordBookPage() {
       holder: playersTraded[0]?.teamName ?? null,
       value: playersTraded[0] ? String(playersTraded[0].value) : null,
       placeholder: "No League Trades Recorded",
+      rosterId: playersTraded[0]?.rosterId ?? null,
     },
     {
       glyph: "payout",
@@ -284,8 +318,10 @@ export default async function RecordBookPage() {
       key: "championships",
       icon: "championship" as const,
       label: "Championships",
-      value: firstChampion ?? "Waiting for History",
-      waiting: !firstChampion,
+      value: titleLeaders[0] ? String(titleLeaders[0].value) : "Waiting for History",
+      subtext: titleLeaders[0]?.teamName ?? null,
+      numeric: Boolean(titleLeaders[0]),
+      waiting: !titleLeaders[0],
     },
     {
       key: "playoffs",
@@ -311,11 +347,7 @@ export default async function RecordBookPage() {
     <div className="trophy-page record-book-page">
       <div className="history-grid">
         <aside className="trophy-side">
-          <MuseumDirectory
-            title="Browse Records"
-            items={CATEGORIES}
-            ariaLabel="Record categories"
-          />
+          <RecordBookDirectory />
 
           <Panel className="panel--rewards p-3">
             <div className="foundation-body">
@@ -346,7 +378,7 @@ export default async function RecordBookPage() {
             </div>
           </Panel>
 
-          <Panel className="panel--vaults p-4">
+          <Panel id="all-time-leaders" className="panel--vaults p-4">
             <div className="section-heading">
               <div>
                 <h2 className="section-title">All-Time Leaders</h2>
@@ -360,26 +392,31 @@ export default async function RecordBookPage() {
 
           <div className="record-sections">
             <RecordSection
+              id="offensive-records"
               title="Offensive Records"
               entries={offensive}
               variant="offensive"
             />
             <RecordSection
+              id="defensive-records"
               title="Defensive Records"
               entries={defensive}
               variant="defensive"
             />
             <RecordSection
+              id="win-streaks"
               title="Win Streaks"
               entries={streakEntries}
               variant="streak"
             />
             <RecordSection
+              id="misc-records"
               title="Miscellaneous Records"
               entries={misc}
               variant="misc"
             />
             <RecordSection
+              id="trade-records"
               title="Trade Records"
               entries={tradeEntries}
               variant="trade"
@@ -388,7 +425,7 @@ export default async function RecordBookPage() {
         </section>
 
         <aside className="trophy-feature">
-          <Panel className="panel--ringfeature p-4">
+          <Panel id="championship-history" className="panel--ringfeature p-4">
             <h2 className="trophy-panel-title">Championship History</h2>
             <div className="rb-championship-wall">
               {PLAQUE_YEARS.map((year) => {
@@ -453,9 +490,12 @@ export default async function RecordBookPage() {
                 );
               })}
             </div>
-            <span className="metal-button mt-3 w-full">
+            <Link
+              href="/trophy-room"
+              className="metal-button mt-3 w-full inline-flex justify-center"
+            >
               View Full Championship History
-            </span>
+            </Link>
           </Panel>
         </aside>
       </div>

@@ -187,6 +187,51 @@ export function careerPointsFor(history: LeagueHistory): LeaderRow[] {
   );
 }
 
+/** Career points-against per roster (opponent points scored). */
+export function careerPointsAgainst(history: LeagueHistory): LeaderRow[] {
+  const pa = new Map<number, number>();
+  const ids = new Set<number>();
+  for (const g of history.games) {
+    ids.add(g.rosterId);
+    pa.set(g.rosterId, (pa.get(g.rosterId) ?? 0) + g.opponentPoints);
+  }
+  return leaderboard(
+    history,
+    (id) => Math.round((pa.get(id) ?? 0) * 100) / 100,
+    ids,
+  );
+}
+
+/** Fewest points allowed in a single season (best defensive season). */
+export function fewestPointsAgainstSeason(
+  history: LeagueHistory,
+): (LeaderRow & { season: string }) | null {
+  const bySeasonRoster = new Map<string, number>();
+  for (const g of history.games) {
+    const key = `${g.season}:${g.rosterId}`;
+    bySeasonRoster.set(key, (bySeasonRoster.get(key) ?? 0) + g.opponentPoints);
+  }
+
+  let best: { rosterId: number; season: string; value: number } | null = null;
+  for (const [key, total] of bySeasonRoster) {
+    const sep = key.indexOf(":");
+    const season = key.slice(0, sep);
+    const rosterId = Number(key.slice(sep + 1));
+    const value = Math.round(total * 100) / 100;
+    if (!best || value < best.value) {
+      best = { rosterId, season, value };
+    }
+  }
+
+  if (!best) return null;
+  return {
+    rosterId: best.rosterId,
+    teamName: teamName(history, best.rosterId),
+    value: best.value,
+    season: best.season,
+  };
+}
+
 /** Playoff wins per roster. */
 export function playoffWins(history: LeagueHistory): LeaderRow[] {
   const wins = new Map<number, number>();
@@ -249,6 +294,54 @@ export function biggestBlowouts(history: LeagueHistory, limit = 10): GameRecord[
       ...rest,
       detail: `+${margin.toFixed(1)} margin`,
     }));
+}
+
+/** Highest single-game playoff scores. */
+export function topPlayoffScores(
+  history: LeagueHistory,
+  limit = 10,
+): GameRecord[] {
+  return [...history.games]
+    .filter((g) => g.isPlayoff && g.points > 0)
+    .sort((a, b) => b.points - a.points)
+    .slice(0, limit)
+    .map((g) => ({
+      rosterId: g.rosterId,
+      teamName: teamName(history, g.rosterId),
+      season: g.season,
+      week: g.week,
+      points: g.points,
+    }));
+}
+
+/** Longest win streak within a single season, best across all seasons per roster. */
+export function longestSeasonWinStreaks(history: LeagueHistory): LeaderRow[] {
+  const bySeasonRoster = new Map<string, GameResult[]>();
+  for (const g of history.games) {
+    const key = `${g.season}:${g.rosterId}`;
+    const arr = bySeasonRoster.get(key) ?? [];
+    arr.push(g);
+    bySeasonRoster.set(key, arr);
+  }
+
+  const bestByRoster = new Map<number, number>();
+  for (const [key, list] of bySeasonRoster) {
+    const rosterId = Number(key.slice(key.indexOf(":") + 1));
+    list.sort((a, b) => a.week - b.week);
+    let cur = 0;
+    let best = 0;
+    for (const g of list) {
+      cur = g.win ? cur + 1 : 0;
+      best = Math.max(best, cur);
+    }
+    bestByRoster.set(rosterId, Math.max(bestByRoster.get(rosterId) ?? 0, best));
+  }
+
+  return leaderboard(
+    history,
+    (id) => bestByRoster.get(id) ?? 0,
+    bestByRoster.keys(),
+  );
 }
 
 /** Longest win streaks, overall and in the playoffs. */

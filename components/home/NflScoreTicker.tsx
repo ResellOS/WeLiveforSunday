@@ -1,6 +1,6 @@
 "use client";
 
-import type { NflTickerGame } from "@/lib/home";
+import type { NflTickerGame } from "@/lib/nflSchedule";
 import { sleeperTeamLogo } from "@/lib/sleeperMedia";
 
 function statusClass(game: NflTickerGame): string {
@@ -68,7 +68,24 @@ function GameCard({ game }: { game: NflTickerGame }) {
   );
 }
 
-export function NflScoreTicker({ games }: { games: NflTickerGame[] }) {
+export function NflScoreTicker({
+  games,
+  label,
+}: {
+  games: NflTickerGame[];
+  label?: string;
+}) {
+  if (games.length === 0) {
+    return (
+      <div className="nfl-scores-board">
+        <div className="nfl-scores-header">
+          <h3 className="nfl-ticker-title">NFL Schedule</h3>
+        </div>
+        <p className="nfl-scores-empty">No games scheduled for this week.</p>
+      </div>
+    );
+  }
+
   const cols = 5;
   const rows = Math.ceil(games.length / cols);
 
@@ -78,7 +95,7 @@ export function NflScoreTicker({ games }: { games: NflTickerGame[] }) {
         <h3 className="nfl-ticker-title">NFL Live Scores</h3>
         <span className="nfl-scores-live-pill">
           <span className="live-badge-dot" />
-          SCHEDULE
+          {label ?? "SCHEDULE"}
         </span>
       </div>
       <div

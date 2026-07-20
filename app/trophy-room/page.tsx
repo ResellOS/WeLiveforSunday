@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import { getSeasons, getJerseys } from "@/lib/queries";
 import { loadLeagueHistory, getSeasonChain } from "@/lib/records";
+import { ChampionshipHistoryLink } from "@/components/trophy-room/ChampionshipHistory";
 import { Panel } from "@/components/ui/Panel";
 import { TrophyGlyph } from "@/components/trophy/TrophyGlyph";
 import { TrophyRoomSidebar } from "@/components/trophy-room/TrophyRoomSidebar";
@@ -67,7 +68,7 @@ export default async function TrophyRoomPage({
             </p>
           </div>
         </div>
-        <span className="panel-action">View Championship History</span>
+        <ChampionshipHistoryLink>View Championship History</ChampionshipHistoryLink>
       </Panel>
 
       <div className="trophy-grid">
